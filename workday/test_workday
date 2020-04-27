@@ -1,0 +1,164 @@
+#!/bin/bash
+# shellcheck disable=SC1091
+
+
+# 全てのテストに対する共通の環境を準備する
+function oneTimeSetUp() {
+	readonly TESTEE='workday.func'
+    cat <<__EOC__
+--------------------------------------------------------------------------------
+shUnit2 開始  バージョン：  ${SHUNIT_VERSION}   一時領域：   ${SHUNIT_TMPDIR}
+テスト対象：  ${TESTEE}
+--------------------------------------------------------------------------------
+__EOC__
+	. ./workday.func
+}
+
+# 全てのテストが完了した後、環境をきれいにする
+function oneTimeTearDown() {
+    cat <<__EOC__
+--------------------------------------------------------------------------------
+shUnit2 終了
+--------------------------------------------------------------------------------
+__EOC__
+}
+
+
+# 各テストの前に環境を再設定する
+function setUp() {
+	workday_setup    
+}
+
+# 各テストの後に環境をきれいにする
+function tearDown() {
+    :
+}
+
+#function suite() {
+#    suite_addTest testFunc
+#}
+
+function print_stacktrace() {
+  index=1
+  while frame=($(caller "${index}")); do
+    ((index++))
+    # at function <function name> (<file name>:<line no>)
+    echo "at function ${frame[1]} (${frame[2]}:${frame[0]})" >&2
+  done
+}
+
+# テスト関数
+
+function testFunc() {
+	assertTrue "0"
+}
+
+function test_shellcheck() {
+	shellcheck workday workday.func test_workday
+	assertTrue "$?"
+}
+
+function test_update_calender() {
+	update_calender
+	assertTrue "[ ! -f ${tmp_dir}/Holiday.txt ]"
+}
+
+function test_workday_main1(){
+	result=$(workday_main "20210104" "-5")
+	expect=20201223
+	echo expect: "${expect}" result: "${result}"
+	assertEquals "${expect}" "${result}"
+	result=$(./workday "20210104" "-5")
+	expect=20201223
+	echo expect: "${expect}" result: "${result}"
+	assertEquals "${expect}" "${result}"
+}
+
+function test_workday_main2(){
+	result=$(workday_main)
+	expect=$(date -d today +%Y%m%d)
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "[ ${expect} -le ${result} ]"
+	result=$(./workday)
+	expect=$(date -d today +%Y%m%d)
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "[ ${expect} -le ${result} ]"
+}
+
+function test_workday_main3(){
+	result=$(workday_main -h)
+	expect="usage message"
+	echo expect: "${expect}" result: "${result}"
+	#assertEquals "${expect}" "${result}"
+	result=$(./workday -h)
+	expect="usage message"
+	echo expect: "${expect}" result: "${result}"
+	#assertEquals "${expect}" "${result}"
+}
+
+function test_isholiday1(){
+	result=$(isholiday 20200423)
+	expect=""
+	echo expect: "${expect}" result: "${result}"
+	assertEquals "${expect}" "${result}"
+}
+
+function test_isholiday2(){
+	result=$(isholiday 20200425)
+	expect="20200425"
+	echo expect: "${expect}" result: "${result}"
+	assertEquals "${expect}" "${result}"
+}
+
+function test_isholiday3(){
+	result=$(isholiday 20200429)
+	expect="20200429"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+function test_isholiday3n(){
+	result=$(isholiday 20200428)
+	expect="20200429"
+	echo unexpect: "${expect}" result: "${result}"
+	assertFalse "echo ${result} | grep ${expect}"
+}
+
+function test_isholiday4(){
+	result=$(isholiday 20200813)
+	expect="20200813"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+function test_skipholiday1(){
+	result=$(skip_holiday 20200423 1)
+	expect="20200423"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+function test_skipholiday2(){
+	result=$(skip_holiday 20200425 1)
+	expect="20200427"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+function test_skipholiday3(){
+	result=$(skip_holiday 20200426 -1)
+	expect="20200424"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+function test_search_workday1(){
+	result=$(search_workday 20210104 -3)
+	expect="20201225"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+}
+
+# shUnit2のロード
+. shunit2 || echo "apt-get install shunit2"
+

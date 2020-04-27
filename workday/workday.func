@@ -1,0 +1,93 @@
+#!/bin/bash
+# shellcheck disable=SC1090
+
+function workday_setup(){
+
+# configs
+
+tmp_dir=.
+#ICS=https://ical.mac.com/ical/Japanese32Holidays.ics
+ICS=${ICS:-https://www.google.com/calendar/ical/ja.japanese%23holiday%40group.v.calendar.google.com/public/basic.ics}
+#ICS=https://www.mozilla.org/projects/calendar/caldata/JapanHolidays.ics
+LOCALHOLIDAY=${LOCALHOLIDAY:-'20200813
+20200814
+20201230
+20201231
+20210104'}
+
+# override config
+if [ -f "${HOME}/.workday.cfg" ]
+then
+	. "${HOME}/.workday.cfg"
+fi
+}
+
+function update_calender()
+{
+	if [ "$(find ${tmp_dir}/Holidays.txt -mtime -1 2>/dev/null | wc -l)" -eq 0 ]
+	then
+		curl -s -S -L "${ICS}" |
+		grep -e "DTSTART;VALUE=DATE" -e SUMMARY -e "BEGIN:VEVENT" -e "END:VEVENT" | tr -d '\r\n' | sed 's/END:VEVENT/\n/g' | sed 's/BEGIN:VEVENT//g' | sed 's/:/ /g' | sed 's/SUMMARY/ /g' | awk '{print $2,$NF}' | awk '{if ( $1 ~/^[0-9]+$/){ print $1,$NF}else{ print $NF,$1}}' | sort -k 1 > ${tmp_dir}/Holidays.txt
+	fi
+}
+
+function isholiday(){
+	local dayofweek
+	dayofweek=$(date -d "$1" "+%w")
+	if [ "${dayofweek}" -eq "0" ] || [ "${dayofweek}" -eq "6" ]
+	then echo "$1"
+	else
+		( cat "${tmp_dir}/Holidays.txt" ; echo "${LOCALHOLIDAY}" ) | grep "$1" || true
+	fi
+}
+
+
+function skip_holiday (){
+	local day step_l holiday 
+	day="$1"
+	step_l="$2"
+	holiday=$(isholiday "${day}")
+	while [ ! -z "${holiday}" ]
+	do
+		day=$(date --date "${day} ${step_l} days" +%Y%m%d)
+		holiday=$(isholiday "${day}")
+	done
+	echo "${day}"
+}
+
+function search_workday (){
+	local dayskip iter step
+	iter="${1}"
+	dayskip="${2}"
+	if [ "${dayskip}" -ge 0 ] ; then step=1 ;else step=-1; fi
+
+	if [ "${dayskip}" -eq 0 ] 
+	then
+		iter=$(skip_holiday "${iter}" "${step}")
+	else
+		while [ "${dayskip}" -ne 0 ]
+		do
+			dayskip=$(("${dayskip}" - "${step}"))
+			iter=$(date --date "${iter} ${step} days" +%Y%m%d)
+			iter=$(skip_holiday "${iter}" "${step}")
+		done
+	fi
+	echo "${iter}"
+}
+
+function usage (){
+	echo "usage: $0 [day %Y%m%d format] [step +/-day]"
+	echo ""
+	echo "example) $0 20210104 -3"
+	echo "		3 work days before 2021/01/04"
+	echo ""
+		
+}
+
+function workday_main(){
+	if [ "$#" -ge 1 ] && [ "$1" == "-h" ] ; then usage ; exit 0 ;fi
+	workday_setup 
+	update_calender
+	search_workday "${1:-$(date -d today +%Y%m%d)}" "${2:-0}"
+}
+

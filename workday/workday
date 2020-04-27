@@ -1,0 +1,6 @@
+#!/bin/bash
+set -eu
+
+. workday.func
+workday_main "${1-}" "${2-}"
+
