@@ -1,6 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC1091
-
+# shellcheck disable=SC1091,SC2207
 
 # 全てのテストに対する共通の環境を準備する
 function oneTimeSetUp() {
@@ -34,8 +33,9 @@ function tearDown() {
     :
 }
 
+# suite をコメントアウトすると function test.* がテスト実行される 
 #function suite() {
-#    suite_addTest testFunc
+#    suite_addTest test_skipholiday4
 #}
 
 function print_stacktrace() {
@@ -45,6 +45,7 @@ function print_stacktrace() {
     # at function <function name> (<file name>:<line no>)
     echo "at function ${frame[1]} (${frame[2]}:${frame[0]})" >&2
   done
+  echo "end of frame." >&2
 }
 
 # テスト関数
@@ -152,6 +153,29 @@ function test_skipholiday3(){
 	assertTrue "echo ${result} | grep ${expect}"
 }
 
+function test_skipholiday4(){
+	local original_isholiday
+	original_isholiday=$(declare -f isholiday)
+	function isholiday(){
+		print_stacktrace
+		if [ "$1" == "20200507" ]
+		then
+			echo 20200507
+		fi
+	}
+	result=$(skip_holiday 20200507 1)
+	expect="20200508"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+
+	result=$(skip_holiday 20200507 -1)
+	expect="20200506"
+	echo expect: "${expect}" result: "${result}"
+	assertTrue "echo ${result} | grep ${expect}"
+
+	eval "${original_isholiday}"
+}
+
 function test_search_workday1(){
 	result=$(search_workday 20210104 -3)
 	expect="20201225"
@@ -160,5 +184,5 @@ function test_search_workday1(){
 }
 
 # shUnit2のロード
-. shunit2 || echo "apt-get install shunit2"
+. shunit2 || echo "sudo apt-get install shunit2"
 

@@ -46,7 +46,6 @@ function isholiday(){
 	fi
 }
 
-
 function skip_holiday (){
 	local day step_l holiday 
 	day="$1"
